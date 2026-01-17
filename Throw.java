@@ -1,5 +1,3 @@
-import java.util.List;
-
 public class Throw {
     private Stick[] sticks = new Stick[4];
 
@@ -38,6 +36,7 @@ public class Throw {
             if (i < 3)
                 System.out.print(" ");
         }
-        System.out.println();
+
+        System.out.println(" → Roll: " + value);
     }
 }
