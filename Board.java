@@ -1,13 +1,12 @@
-
 import java.util.*;
 
 public class Board {
-
     public static final int BOARD_SIZE = 30;
     public static final int HUMAN = 1;
     public static final int AI = -1;
     public static final int EMPTY = 0;
 
+    // ANSI color codes for console display
     public static final String RESET = "\u001B[0m";
     public static final String BLUE = "\u001B[34m";
     public static final String RED = "\u001B[31m";
@@ -54,53 +53,97 @@ public class Board {
     }
 
     public static void applyMove(int[] board, Move move, int player, boolean verbose) {
+        int from = move.from - 1; // Convert to 0-based index
+        int to = move.to - 1; // Convert to 0-based index
 
-        int from = move.from;
-        int to = move.to;
-
-        board[from] = EMPTY;
-
-        if (to == -1) {
-            if (verbose) {
-                System.out.println(player == HUMAN
-                        ? "🎉 Human piece exited!"
-                        : "🎉 AI piece exited!");
-            }
-            return;
-        }
-
-        if (board[to] != EMPTY && verbose) {
-            System.out.println(board[to] == HUMAN
-                    ? "Human piece captured!"
-                    : "AI piece captured!");
-        }
-
-        board[to] = player;
-
-        int result = Rules.applySpecialSquareEffect(to);
-
-        if (result == -1) {
-            board[to] = EMPTY;
-            if (verbose) {
-                System.out.println(player == HUMAN
-                        ? "🎉 Human piece exited via Horus!"
-                        : "🎉 AI piece exited via Horus!");
+        // Handle moving from off-board position
+        if (move.from == 0) {
+            // New piece entering the board
+            if (board[0] == EMPTY) {
+                board[0] = player;
+                return;
             }
         }
 
-        else if (result != to) {
-            board[to] = EMPTY;
+        // Basic move logic
+        if (from >= 0 && from < BOARD_SIZE && board[from] == player) {
+            // Check if we're moving to an occupied square
+            if (to >= 0 && to < BOARD_SIZE && board[to] != EMPTY) {
+                // Handle piece swapping according to Senet rules
+                if (!Rules.isProtected(to + 1)) {
+                    // Swap positions instead of capturing
+                    int temp = board[to];
+                    board[to] = player;
+                    board[from] = temp;
 
-            if (board[result] != EMPTY && verbose) {
-                System.out.println(board[result] == HUMAN
-                        ? "Human piece captured!"
-                        : "AI piece captured!");
+                    if (verbose) {
+                        System.out.println("↪ Pieces swapped positions!");
+                    }
+                } else {
+                    // Protected square - cannot land here
+                    if (verbose) {
+                        System.out.println("❌ Cannot land on protected square!");
+                    }
+                    return;
+                }
+            } else {
+                // Normal move to empty square
+                board[from] = EMPTY;
+                if (to >= 0 && to < BOARD_SIZE) {
+                    board[to] = player;
+                }
             }
+        }
 
-            board[result] = player;
+        // Handle special square effects
+        if (to >= 0 && to < BOARD_SIZE) {
+            int result = Rules.applySpecialSquareEffect(to + 1, board); // Pass board for rebirth logic
 
-            if (verbose) {
-                System.out.println("↪ Piece moved to square " + (result + 1));
+            if (result == -1) {
+                // Piece exits the board
+                board[to] = EMPTY;
+                if (verbose) {
+                    System.out.println(player == HUMAN
+                            ? "🎉 Human piece exited!"
+                            : "🎉 AI piece exited!");
+                }
+            } else if (result != to + 1) {
+                // Piece moved to a different square due to special effect
+                board[to] = EMPTY;
+                int newIndex = result - 1;
+
+                // Check if the target square is occupied
+                if (newIndex >= 0 && newIndex < BOARD_SIZE && board[newIndex] != EMPTY) {
+                    if (verbose) {
+                        System.out.println("Target square " + result + " is occupied!");
+                    }
+
+                    // Find first empty square before the target
+                    int searchIndex = newIndex - 1;
+                    while (searchIndex >= 0 && board[searchIndex] != EMPTY) {
+                        searchIndex--;
+                    }
+
+                    if (searchIndex >= 0) {
+                        if (verbose) {
+                            System.out.println("Moving to first empty square at position " + (searchIndex + 1));
+                        }
+                        board[searchIndex] = player;
+                    } else {
+                        // No empty squares found - this shouldn't happen in normal play
+                        if (verbose) {
+                            System.out.println("⚠️ No empty squares found! Placing at position 1");
+                        }
+                        board[0] = player;
+                    }
+                } else {
+                    // Target square is empty
+                    board[newIndex] = player;
+                }
+
+                if (verbose) {
+                    System.out.println("↪ Piece moved to square " + result);
+                }
             }
         }
     }
@@ -116,14 +159,4 @@ public class Board {
         demo[29] = HUMAN;
         printBoard(demo);
     }
-
-    // ======================
-    // MAIN METHOD FOR TESTING
-    // ======================
-
-    // public static void main(String[] args) {
-    // System.out.println(WHITE + "🔍 Running board rendering test..." + RESET);
-    // testPrintBoard();
-    // System.out.println(GREEN + "✅ Board rendering test complete!" + RESET);
-    // }
 }

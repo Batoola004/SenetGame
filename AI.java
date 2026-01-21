@@ -1,50 +1,32 @@
-
 import java.util.List;
 
 public class AI {
-
-    private static final double P_1 = 0.25;
-    private static final double P_2 = 0.375;
-    private static final double P_3 = 0.25;
-    private static final double P_4 = 0.0625;
-    private static final double P_5 = 0.0625;
+    // Dice roll probabilities for 4 sticks (Kendall's rules)
+    private static final double P_1 = 0.25; // 1 stick showing dark
+    private static final double P_2 = 0.375; // 2 sticks showing dark
+    private static final double P_3 = 0.25; // 3 sticks showing dark
+    private static final double P_4 = 0.0625; // 4 sticks showing dark
+    private static final double P_5 = 0.0625; // 0 sticks showing dark (counts as 5)
 
     private int nodesVisited = 0;
-
-    private double evaluate(int[] board, int player) {
-        double score = 0;
-
-        for (int i = 0; i < board.length; i++) {
-            if (board[i] == player) {
-                score += (i + 1);
-                if (Rules.isProtected(i + 1))
-                    score += 5;
-            } else if (board[i] == -player) {
-                score -= (i + 1);
-                if (Rules.isProtected(i + 1))
-                    score -= 5;
-            }
-        }
-        return score;
-    }
+    private double lastEvaluation = 0.0;
 
     public Move getBestMove(int[] board, int diceRoll, int depth) {
-
         nodesVisited = 0;
         List<Move> moves = Rules.getPossibleMoves(board, Board.AI, diceRoll);
 
-        if (moves.isEmpty())
+        if (moves.isEmpty()) {
+            System.out.println("DEBUG: No valid moves available for AI");
             return null;
+        }
 
         Move bestMove = null;
         double bestValue = Double.NEGATIVE_INFINITY;
 
         for (Move move : moves) {
             int[] newBoard = board.clone();
-
             Board.applyMove(newBoard, move, Board.AI, false);
-
-            double val = expectiminimax(newBoard, depth - 1, false);
+            double val = expectiminimaxRecursive(newBoard, depth - 1, false, 0);
 
             if (val > bestValue) {
                 bestValue = val;
@@ -52,56 +34,136 @@ public class AI {
             }
         }
 
-        System.out.println("AI Search: " + nodesVisited +
-                " nodes visited. Eval: " + bestValue);
-
+        lastEvaluation = bestValue;
+        System.out.println("AI Search: " + nodesVisited + " nodes visited. Eval: " + bestValue);
         return bestMove;
     }
 
-    private double expectiminimax(int[] board, int depth, boolean isMax) {
-
-        nodesVisited++;
-
-        if (depth == 0) {
-            return evaluate(board, Board.AI);
-        }
-
-        double total = 0;
-
-        total += P_1 * getBestMoveValue(board, 1, depth, isMax);
-        total += P_2 * getBestMoveValue(board, 2, depth, isMax);
-        total += P_3 * getBestMoveValue(board, 3, depth, isMax);
-        total += P_4 * getBestMoveValue(board, 4, depth, isMax);
-        total += P_5 * getBestMoveValue(board, 5, depth, isMax);
-
-        return total;
+    public double getLastEvaluation() {
+        return lastEvaluation;
     }
 
-    private double getBestMoveValue(int[] board, int roll, int depth, boolean isMax) {
+    public int getNodesVisited() {
+        return nodesVisited;
+    }
 
-        int player = isMax ? Board.AI : Board.HUMAN;
-        List<Move> moves = Rules.getPossibleMoves(board, player, roll);
+    // Main expectiminimax function with proper chance nodes
+    private double expectiminimaxRecursive(int[] board, int depth, boolean isMaxTurn, int fixedRoll) {
+        nodesVisited++;
 
+        // Check for terminal states first
+        if (hasWon(board, Board.AI)) {
+            return 10000 + depth; // Prefer faster wins
+        }
+        if (hasWon(board, Board.HUMAN)) {
+            return -10000 - depth; // Prefer slower losses
+        }
+
+        if (depth <= 0) {
+            return evaluate(board);
+        }
+
+        // Chance node - we need to roll the dice
+        if (fixedRoll == 0) {
+            double weightedAverage = 0;
+
+            // Try all possible dice rolls with their probabilities
+            weightedAverage += P_1 * expectiminimaxRecursive(board, depth, isMaxTurn, 1);
+            weightedAverage += P_2 * expectiminimaxRecursive(board, depth, isMaxTurn, 2);
+            weightedAverage += P_3 * expectiminimaxRecursive(board, depth, isMaxTurn, 3);
+            weightedAverage += P_4 * expectiminimaxRecursive(board, depth, isMaxTurn, 4);
+            weightedAverage += P_5 * expectiminimaxRecursive(board, depth, isMaxTurn, 5);
+
+            return weightedAverage;
+        }
+
+        // Decision node - generate moves for current player
+        int player = isMaxTurn ? Board.AI : Board.HUMAN;
+        List<Move> moves = Rules.getPossibleMoves(board, player, fixedRoll);
+
+        // If no moves available, pass turn
         if (moves.isEmpty()) {
-            return expectiminimax(board, depth - 1, !isMax);
+            return expectiminimaxRecursive(board, depth - 1, !isMaxTurn, 0);
         }
 
-        double best = isMax
-                ? Double.NEGATIVE_INFINITY
-                : Double.POSITIVE_INFINITY;
+        if (isMaxTurn) {
+            // MAX node (AI's turn)
+            double maxEval = Double.NEGATIVE_INFINITY;
 
-        for (Move move : moves) {
-            int[] nextBoard = board.clone();
+            for (Move move : moves) {
+                int[] nextBoard = board.clone();
+                Board.applyMove(nextBoard, move, player, false);
+                double eval = expectiminimaxRecursive(nextBoard, depth - 1, false, 0);
 
-            Board.applyMove(nextBoard, move, player, false);
+                if (eval > maxEval) {
+                    maxEval = eval;
+                }
+            }
+            return maxEval;
+        } else {
+            // MIN node (Human's turn)
+            double minEval = Double.POSITIVE_INFINITY;
 
-            double val = expectiminimax(nextBoard, depth - 1, !isMax);
+            for (Move move : moves) {
+                int[] nextBoard = board.clone();
+                Board.applyMove(nextBoard, move, player, false);
+                double eval = expectiminimaxRecursive(nextBoard, depth - 1, true, 0);
 
-            best = isMax
-                    ? Math.max(best, val)
-                    : Math.min(best, val);
+                if (eval < minEval) {
+                    minEval = eval;
+                }
+            }
+            return minEval;
+        }
+    }
+
+    // Heuristic evaluation function with bearing off bonuses
+    private double evaluate(int[] board) {
+        double score = 0;
+        int aiPieces = 0;
+        int humanPieces = 0;
+
+        for (int i = 0; i < board.length; i++) {
+            if (board[i] == Board.AI) {
+                aiPieces++;
+                score += (i + 1); // Position advancement
+
+                // Bonus for special squares
+                if (i + 1 > 25) {
+                    score += 5;
+                }
+
+                // Extra bonus for being close to exit
+                if (i + 1 >= 28) {
+                    score += 10;
+                }
+            } else if (board[i] == Board.HUMAN) {
+                humanPieces++;
+                score -= (i + 1);
+
+                if (i + 1 > 25) {
+                    score -= 5;
+                }
+
+                if (i + 1 >= 28) {
+                    score -= 10;
+                }
+            }
         }
 
-        return best;
+        // HUGE bonuses for bearing off pieces - this is the main goal
+        score += (5 - aiPieces) * 100; // AI wants to bear off pieces
+        score -= (5 - humanPieces) * 100; // AI wants to prevent human from bearing off
+
+        return score;
+    }
+
+    private boolean hasWon(int[] board, int player) {
+        for (int i = 0; i < board.length; i++) {
+            if (board[i] == player) {
+                return false;
+            }
+        }
+        return true;
     }
 }
