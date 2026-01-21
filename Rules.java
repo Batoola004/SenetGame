@@ -1,5 +1,4 @@
 
-// Rules.java
 import java.util.*;
 
 public class Rules {
