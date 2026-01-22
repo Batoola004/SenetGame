@@ -4,26 +4,31 @@ import java.awt.geom.*;
 
 public class GameBoardPanel extends JPanel {
     private int[] currentBoard;
-    private Color boardColor = new Color(205, 133, 63); // Peru
-    private Color safeColor = new Color(154, 205, 50); // Yellow Green
-    private Color specialColor = new Color(218, 165, 32); // Goldenrod
-    private Color highlightColor = new Color(255, 215, 0, 128); // Gold with transparency
+    private Color boardColor = new Color(205, 133, 63);
+    private Color safeColor = new Color(154, 205, 50);
+    private Color specialColor = new Color(218, 165, 32);
+    private Color highlightColor = new Color(255, 215, 0, 128);
     private Move highlightedMove;
 
     public GameBoardPanel() {
-        setPreferredSize(new Dimension(1000, 750)); // Increased size
-        setBackground(new Color(245, 222, 179)); // Wheat
+        // Increased preferred size to accommodate larger squares
+        setPreferredSize(new Dimension(1200, 850));
+        setBackground(new Color(245, 222, 179));
         setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(139, 69, 19), 4),
                 BorderFactory.createEmptyBorder(20, 20, 20, 20)));
     }
 
     public void setBoard(int[] board) {
-        this.currentBoard = board.clone();
+        // System.out.println("DEBUG: setBoard called");
+        if (board != null) {
+            this.currentBoard = board.clone();
+        }
         repaint();
     }
 
     public void highlightMove(Move move) {
+        // System.out.println("DEBUG: highlighting move: " + move);
         this.highlightedMove = move;
         repaint();
     }
@@ -34,217 +39,161 @@ public class GameBoardPanel extends JPanel {
         Graphics2D g2d = (Graphics2D) g;
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        if (currentBoard == null) {
+        if (currentBoard == null)
             return;
-        }
 
-        // Draw the board in 3 rows
-        drawBoardRow(g2d, 0, 9, 100, 120, true); // Row 1: 1-10
-        drawBoardRow(g2d, 19, 10, 100, 300, false); // Row 2: 20-11
-        drawBoardRow(g2d, 20, 29, 100, 480, true); // Row 3: 21-30
+        // Increased square size from 80 to 100 for better visibility
+        int squareSize = 100;
+        int spacing = 12;
+        int startX = 50;
 
-        // Draw title
+        // Draw the 3 rows of the Senet board
+        drawBoardRow(g2d, 0, 9, startX, 120, true, squareSize, spacing);
+        drawBoardRow(g2d, 19, 10, startX, 120 + squareSize + spacing, false, squareSize, spacing);
+        drawBoardRow(g2d, 20, 29, startX, 120 + (squareSize + spacing) * 2, true, squareSize, spacing);
+
         drawTitle(g2d);
-
-        // Draw legend
-        drawLegend(g2d, 100, 650);
+        drawLegend(g2d, startX, 550);
     }
 
-    private void drawBoardRow(Graphics2D g2d, int start, int end, int x, int y, boolean leftToRight) {
-        int squareSize = 80; // Increased size
-        int spacing = 15;
+    private void drawBoardRow(Graphics2D g2d, int start, int end, int x, int y, boolean leftToRight, int size,
+            int spacing) {
         int direction = leftToRight ? 1 : -1;
         int xPos = x;
 
         for (int i = start; leftToRight ? i <= end : i >= end; i += direction) {
-            drawSquare(g2d, i, xPos, y, squareSize);
-            xPos += squareSize + spacing;
+            drawSquare(g2d, i, xPos, y, size);
+            xPos += size + spacing;
         }
     }
 
     private void drawSquare(Graphics2D g2d, int index, int x, int y, int size) {
         Color squareColor = getSquareColor(index);
         g2d.setColor(squareColor);
-        g2d.fillRoundRect(x, y, size, size, 15, 15);
+        g2d.fillRoundRect(x, y, size, size, 10, 10);
+
         g2d.setColor(Color.BLACK);
-        g2d.drawRoundRect(x, y, size, size, 15, 15);
+        g2d.setStroke(new BasicStroke(2));
+        g2d.drawRoundRect(x, y, size, size, 10, 10);
 
-        // Highlight if this is part of a move
+        // Highlight logic
         if (highlightedMove != null) {
-            int fromIndex = highlightedMove.from - 1;
-            int toIndex = (highlightedMove.to == -1) ? -1 : highlightedMove.to - 1;
+            int fromIdx = highlightedMove.from - 1;
+            int toIdx = (highlightedMove.to == -1) ? -1 : highlightedMove.to - 1;
 
-            if ((fromIndex == index || toIndex == index) && fromIndex >= 0 && toIndex != -2) {
+            if ((fromIdx == index || toIdx == index) && fromIdx >= 0) {
                 g2d.setColor(highlightColor);
-                g2d.fillRoundRect(x, y, size, size, 15, 15);
-
-                // Draw arrow between squares if both are valid
-                if (fromIndex >= 0 && toIndex >= 0 && fromIndex != toIndex) {
-                    g2d.setColor(Color.RED);
-                    g2d.setStroke(new BasicStroke(3));
-
-                    int fromX = x + size / 2;
-                    int fromY = y + size / 2;
-                    int toX, toY;
-
-                    // This is a simplified arrow drawing - in a real implementation
-                    // you'd need to calculate the actual positions of both squares
-                    toX = fromX + 40;
-                    toY = fromY;
-
-                    g2d.drawLine(fromX, fromY, toX, toY);
-
-                    // Draw arrowhead
-                    int arrowSize = 10;
-                    g2d.fillPolygon(new int[] { toX, toX - arrowSize, toX - arrowSize },
-                            new int[] { toY, toY - arrowSize, toY + arrowSize }, 3);
-                }
+                g2d.fillRoundRect(x, y, size, size, 10, 10);
             }
         }
 
-        // Draw square number
-        drawSquareNumber(g2d, index, x, y);
+        // Draw square number - increased font size
+        g2d.setColor(Color.BLACK);
+        g2d.setFont(new Font("Arial", Font.BOLD, 18));
+        g2d.drawString(String.valueOf(index + 1), x + 10, y + 25);
 
         // Draw piece if present
-        if (index >= 0 && index < currentBoard.length && currentBoard[index] != Board.EMPTY) {
+        if (index >= 0 && index < currentBoard.length && currentBoard[index] != 0) {
             drawPiece(g2d, x, y, size, currentBoard[index]);
         }
 
-        // Draw special square symbols
-        drawSpecialSymbol(g2d, x, y, size, index + 1);
+        // Labels for special squares with rules mentioned
+        drawSpecialLabel(g2d, x, y, size, index + 1);
     }
 
     private Color getSquareColor(int index) {
-        int square = index + 1;
-        if (square == Rules.HOUSE_OF_HAPPINESS ||
-                square == Rules.HOUSE_OF_THREE_TRUTHS ||
-                square == Rules.HOUSE_OF_RE_ATUM ||
-                square == Rules.HOUSE_OF_HORUS) {
+        int sq = index + 1;
+        if (sq == 26 || sq == 28 || sq == 29 || sq == 30)
             return specialColor;
-        } else if (square == Rules.HOUSE_OF_REBIRTH || square == Rules.HOUSE_OF_WATER) {
+        if (sq == 15 || sq == 27)
             return safeColor;
-        } else {
-            return boardColor;
-        }
-    }
-
-    private void drawSquareNumber(Graphics2D g2d, int index, int x, int y) {
-        g2d.setColor(Color.BLACK);
-        g2d.setFont(new Font("Arial", Font.BOLD, 16));
-        g2d.drawString(String.valueOf(index + 1), x + 8, y + 25);
+        return boardColor;
     }
 
     private void drawPiece(Graphics2D g2d, int x, int y, int size, int player) {
-        int pieceSize = size - 30;
-        int centerX = x + size / 2;
-        int centerY = y + size / 2;
+        int pSize = size - 40;
+        int cx = x + size / 2;
+        int cy = y + size / 2;
 
-        if (player == Board.HUMAN) {
-            // Blue piece for human
-            g2d.setColor(new Color(30, 144, 255)); // Dodger Blue
-            g2d.fillOval(centerX - pieceSize / 2, centerY - pieceSize / 2, pieceSize, pieceSize);
+        if (player == 1) { // Human
+            g2d.setColor(new Color(30, 144, 255));
+            g2d.fillOval(cx - pSize / 2, cy - pSize / 2, pSize, pSize);
             g2d.setColor(Color.WHITE);
-            g2d.drawOval(centerX - pieceSize / 2, centerY - pieceSize / 2, pieceSize, pieceSize);
-            g2d.setStroke(new BasicStroke(2));
+            g2d.setFont(new Font("Arial", Font.BOLD, 24)); // Bigger text on piece
+            g2d.drawString("H", cx - 9, cy + 9);
+        } else if (player == -1) { // AI
+            g2d.setColor(new Color(220, 20, 60));
+            g2d.fillOval(cx - pSize / 2, cy - pSize / 2, pSize, pSize);
+            g2d.setColor(Color.WHITE);
             g2d.setFont(new Font("Arial", Font.BOLD, 20));
-            g2d.drawString("H", centerX - 8, centerY + 8);
-        } else {
-            // Red piece for AI
-            g2d.setColor(new Color(220, 20, 60)); // Crimson
-            g2d.fillOval(centerX - pieceSize / 2, centerY - pieceSize / 2, pieceSize, pieceSize);
-            g2d.setColor(Color.WHITE);
-            g2d.drawOval(centerX - pieceSize / 2, centerY - pieceSize / 2, pieceSize, pieceSize);
-            g2d.setStroke(new BasicStroke(2));
-            g2d.setFont(new Font("Arial", Font.BOLD, 16));
-            g2d.drawString("AI", centerX - 12, centerY + 6);
+            g2d.drawString("AI", cx - 11, cy + 8);
         }
     }
 
-    private void drawSpecialSymbol(Graphics2D g2d, int x, int y, int size, int square) {
-        g2d.setColor(Color.BLACK);
-        g2d.setFont(new Font("Arial", Font.PLAIN, 16));
-        String symbol = getSymbolForSquare(square);
+    private void drawSpecialLabel(Graphics2D g2d, int x, int y, int size, int square) {
+        g2d.setColor(new Color(40, 40, 40));
+        g2d.setFont(new Font("Arial", Font.BOLD, 12)); // Bolded for better readability
 
-        if (!symbol.isEmpty()) {
-            FontMetrics fm = g2d.getFontMetrics();
-            int symbolWidth = fm.stringWidth(symbol);
-            g2d.drawString(symbol, x + size / 2 - symbolWidth / 2, y + size - 8);
-        }
-    }
+        String line1 = "";
+        String line2 = "";
 
-    private String getSymbolForSquare(int square) {
         switch (square) {
+            case 15:
+                line1 = "REBIRTH";
+                break;
             case 26:
-                return "😊"; // House of Happiness
+                line1 = "HAPPINESS";
+                line2 = "Landed exactly";
+                break;
             case 27:
-                return "💧"; // House of Water
+                line1 = "WATER";
+                line2 = "Go to 15";
+                break;
             case 28:
-                return "❸"; // House of Three Truths
+                line1 = "3 TRUTHS";
+                line2 = "Need 3 to exit";
+                break;
             case 29:
-                return "☀️"; // House of Re-Atum
+                line1 = "RE-ATUM";
+                line2 = "Need 2 to exit";
+                break;
             case 30:
-                return "👁️"; // House of Horus
-            default:
-                return "";
+                line1 = "HORUS";
+                line2 = "Need 1 to exit";
+                break;
+        }
+
+        if (!line1.isEmpty()) {
+            FontMetrics fm = g2d.getFontMetrics();
+            int l1x = x + (size - fm.stringWidth(line1)) / 2;
+            g2d.drawString(line1, l1x, y + size - 25);
+
+            if (!line2.isEmpty()) {
+                g2d.setFont(new Font("Arial", Font.PLAIN, 10));
+                int l2x = x + (size - g2d.getFontMetrics().stringWidth(line2)) / 2;
+                g2d.drawString(line2, l2x, y + size - 10);
+            }
         }
     }
 
     private void drawTitle(Graphics2D g2d) {
-        g2d.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, 32));
+        g2d.setFont(new Font("Serif", Font.BOLD, 36)); // Increased title size
         g2d.setColor(new Color(139, 69, 19));
-        String title = "SENET - Ancient Egyptian Game";
-        FontMetrics fm = g2d.getFontMetrics();
-        int titleWidth = fm.stringWidth(title);
-        g2d.drawString(title, (getWidth() - titleWidth) / 2, 60);
-
-        // Draw decorative border under title
-        g2d.setColor(new Color(218, 165, 32));
-        g2d.setStroke(new BasicStroke(3));
-        int startY = 75;
-        g2d.drawLine(50, startY, getWidth() - 50, startY);
+        g2d.drawString("SENET - ANCIENT EGYPTIAN BOARD", 50, 60);
     }
 
     private void drawLegend(Graphics2D g2d, int x, int y) {
-        g2d.setFont(new Font("Arial", Font.BOLD, 18));
-        g2d.setColor(new Color(139, 69, 19));
-        g2d.drawString("Game Legend:", x, y);
-        y += 40;
-
-        drawLegendItem(g2d, x, y, new Color(30, 144, 255), "Human Player (H)");
-        y += 35;
-        drawLegendItem(g2d, x, y, new Color(220, 20, 60), "AI Player (AI)");
-        y += 35;
-        drawLegendItem(g2d, x, y, specialColor, "Special Squares (26-30)");
-        y += 35;
-        drawLegendItem(g2d, x, y, safeColor, "Safe Squares (15, 27)");
-
-        // Draw special symbols legend
-        x += 450;
-        y -= 120;
-        g2d.setFont(new Font("Arial", Font.BOLD, 18));
-        g2d.drawString("Special Square Effects:", x, y);
-        y += 40;
+        y += 50; // Offset from the board
+        g2d.setFont(new Font("Arial", Font.BOLD, 20));
+        g2d.setColor(Color.BLACK);
+        g2d.drawString("Rules & Info:", x, y);
 
         g2d.setFont(new Font("Arial", Font.PLAIN, 16));
-        g2d.drawString("😊 House of Happiness (26) - Must land exactly", x, y);
-        y += 30;
-        g2d.drawString("💧 House of Water (27) - Return to House of Rebirth", x, y);
-        y += 30;
-        g2d.drawString("❸ House of Three Truths (28) - Exit with roll of 3", x, y);
-        y += 30;
-        g2d.drawString("☀️ House of Re-Atum (29) - Exit with roll of 2", x, y);
-        y += 30;
-        g2d.drawString("👁️ House of Horus (30) - Exit with roll of 1", x, y);
-    }
+        g2d.drawString("- Blue (H): Human player pieces", x, y + 30);
+        g2d.drawString("- Red (AI): Computer opponent pieces", x, y + 60);
+        g2d.drawString("- Gold Squares (26-30): The final stretch. Follow specific exit rolls.", x + 400, y + 30);
+        g2d.drawString("- Green Squares (15, 27): House of Rebirth (Safe) and House of Water (Trap).", x + 400, y + 60);
 
-    private void drawLegendItem(Graphics2D g2d, int x, int y, Color color, String text) {
-        g2d.setColor(color);
-        g2d.fillOval(x, y - 20, 30, 30);
-        g2d.setColor(Color.BLACK);
-        g2d.drawOval(x, y - 20, 30, 30);
-
-        g2d.setColor(Color.BLACK);
-        g2d.setFont(new Font("Arial", Font.PLAIN, 16));
-        g2d.drawString(text, x + 40, y);
+        // System.out.println("DEBUG: Legend rendered");
     }
 }

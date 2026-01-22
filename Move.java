@@ -2,8 +2,8 @@
 import java.util.*;
 
 public class Move {
-    public final int from; // 0 = off-board, 1–30 = on board
-    public final int to; // 1–30, or -1 if exited
+    public final int from;
+    public final int to;
 
     public Move(int from, int to) {
         this.from = from;
