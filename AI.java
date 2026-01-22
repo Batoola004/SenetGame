@@ -1,6 +1,8 @@
+
 import java.util.List;
 
 public class AI {
+
     private static final double P_1 = 0.25;
     private static final double P_2 = 0.375;
     private static final double P_3 = 0.25;
@@ -8,25 +10,25 @@ public class AI {
     private static final double P_5 = 0.0625;
 
     private int nodesVisited = 0;
-    private double lastEvaluation = 0.0;
 
-    public Move getBestMove(int[] board, int diceRoll, int depth) {
+    public Move getBestMove(int[] board, int depth) {
         nodesVisited = 0;
-        List<Move> moves = Rules.getPossibleMoves(board, Board.AI, diceRoll);
-
-        if (moves.isEmpty()) {
-            // System.out.println("DEBUG AI: No moves found for roll " + diceRoll);
-            return null;
-        }
-
         Move bestMove = null;
         double bestValue = Double.NEGATIVE_INFINITY;
 
+        List<Move> moves = Rules.getPossibleMoves(board, Board.AI, 0);
+
         for (Move move : moves) {
-            int[] newBoard = board.clone();
-            Board.applyMove(newBoard, move, Board.AI, false);
-            // System.out.println("DEBUG AI: Checking move " + move);
-            double val = expectiminimaxRecursive(newBoard, depth - 1, false, 0);
+            int[] next = board.clone();
+            Board.applyMove(next, move, Board.AI);
+
+            double val = expectiminimax(
+                    next,
+                    depth - 1,
+                    false,
+                    0,
+                    Double.NEGATIVE_INFINITY,
+                    Double.POSITIVE_INFINITY);
 
             if (val > bestValue) {
                 bestValue = val;
@@ -34,21 +36,16 @@ public class AI {
             }
         }
 
-        lastEvaluation = bestValue;
-        // System.out.println("AI SEARCH LOG: Nodes=" + nodesVisited + " | BestVal=" +
-        // bestValue);
         return bestMove;
     }
 
-    public double getLastEvaluation() {
-        return lastEvaluation;
-    }
-
-    public int getNodesVisited() {
-        return nodesVisited;
-    }
-
-    private double expectiminimaxRecursive(int[] board, int depth, boolean isMaxTurn, int fixedRoll) {
+    private double expectiminimax(
+            int[] board,
+            int depth,
+            boolean isMax,
+            int fixedRoll,
+            double alpha,
+            double beta) {
         nodesVisited++;
 
         if (hasWon(board, Board.AI))
@@ -56,79 +53,90 @@ public class AI {
         if (hasWon(board, Board.HUMAN))
             return -10000 - depth;
 
-        if (depth <= 0)
+        if (depth == 0)
             return evaluate(board);
 
+        /* ---------- CHANCE NODE ---------- */
         if (fixedRoll == 0) {
-            double weightedAverage = 0;
-            weightedAverage += P_1 * expectiminimaxRecursive(board, depth, isMaxTurn, 1);
-            weightedAverage += P_2 * expectiminimaxRecursive(board, depth, isMaxTurn, 2);
-            weightedAverage += P_3 * expectiminimaxRecursive(board, depth, isMaxTurn, 3);
-            weightedAverage += P_4 * expectiminimaxRecursive(board, depth, isMaxTurn, 4);
-            weightedAverage += P_5 * expectiminimaxRecursive(board, depth, isMaxTurn, 5);
-            return weightedAverage;
+            return P_1 * expectiminimax(board, depth - 1, isMax, 1, alpha, beta) +
+                    P_2 * expectiminimax(board, depth - 1, isMax, 2, alpha, beta) +
+                    P_3 * expectiminimax(board, depth - 1, isMax, 3, alpha, beta) +
+                    P_4 * expectiminimax(board, depth - 1, isMax, 4, alpha, beta) +
+                    P_5 * expectiminimax(board, depth - 1, isMax, 5, alpha, beta);
         }
 
-        int player = isMaxTurn ? Board.AI : Board.HUMAN;
+        int player = isMax ? Board.AI : Board.HUMAN;
         List<Move> moves = Rules.getPossibleMoves(board, player, fixedRoll);
 
         if (moves.isEmpty()) {
-            return expectiminimaxRecursive(board, depth - 1, !isMaxTurn, 0);
+            return expectiminimax(board, depth - 1, !isMax, 0, alpha, beta);
         }
 
-        if (isMaxTurn) {
-            double maxEval = Double.NEGATIVE_INFINITY;
-            for (Move move : moves) {
-                int[] nextBoard = board.clone();
-                Board.applyMove(nextBoard, move, player, false);
-                maxEval = Math.max(maxEval, expectiminimaxRecursive(nextBoard, depth - 1, false, 0));
+        if (isMax) {
+            double value = Double.NEGATIVE_INFINITY;
+
+            for (Move m : moves) {
+                int[] next = board.clone();
+                Board.applyMove(next, m, player);
+
+                value = Math.max(value,
+                        expectiminimax(next, depth - 1, false, 0, alpha, beta));
+
+                alpha = Math.max(alpha, value);
+                if (beta <= alpha)
+                    break; // PRUNE
             }
-            return maxEval;
-        } else {
-            double minEval = Double.POSITIVE_INFINITY;
-            for (Move move : moves) {
-                int[] nextBoard = board.clone();
-                Board.applyMove(nextBoard, move, player, false);
-                minEval = Math.min(minEval, expectiminimaxRecursive(nextBoard, depth - 1, true, 0));
-            }
-            return minEval;
+            return value;
         }
+
+        else {
+            double value = Double.POSITIVE_INFINITY;
+
+            for (Move m : moves) {
+                int[] next = board.clone();
+                Board.applyMove(next, m, player);
+
+                value = Math.min(value,
+                        expectiminimax(next, depth - 1, true, 0, alpha, beta));
+
+                beta = Math.min(beta, value);
+                if (beta <= alpha)
+                    break; // PRUNE
+            }
+            return value;
+        }
+    }
+
+    private boolean hasWon(int[] board, int player) {
+        for (int b : board)
+            if (b == player)
+                return false;
+        return true;
     }
 
     private double evaluate(int[] board) {
         double score = 0;
-        int aiPieces = 0;
-        int humanPieces = 0;
 
         for (int i = 0; i < board.length; i++) {
             if (board[i] == Board.AI) {
-                aiPieces++;
-                score += (i + 1);
-                if (i + 1 > 25)
-                    score += 5;
+                score += i + 1;
+                if (i + 1 == 27)
+                    score -= 30;
                 if (i + 1 >= 28)
-                    score += 10;
-            } else if (board[i] == Board.HUMAN) {
-                humanPieces++;
-                score -= (i + 1);
-                if (i + 1 > 25)
-                    score -= 5;
+                    score += 20;
+            }
+            if (board[i] == Board.HUMAN) {
+                score -= i + 1;
+                if (i + 1 == 27)
+                    score += 30;
                 if (i + 1 >= 28)
-                    score -= 10;
+                    score -= 20;
             }
         }
-
-        score += (5 - aiPieces) * 100;
-        score -= (5 - humanPieces) * 100;
-
         return score;
     }
 
-    private boolean hasWon(int[] board, int player) {
-        for (int b : board) {
-            if (b == player)
-                return false;
-        }
-        return true;
+    public int getNodesVisited() {
+        return nodesVisited;
     }
 }

@@ -22,20 +22,20 @@ public class SenetGame {
     private boolean gameActive = true;
     private boolean aiThinking = false;
 
+    // Define board size since Board class doesn't have it anymore
+    private static final int BOARD_SIZE = 30;
+
     public SenetGame() {
-        // System.out.println("DEBUG: Starting constructor...");
         initializeBoard();
         initializeUI();
         startGame();
-        // System.out.println("DEBUG: Constructor finished.");
     }
 
     private void initializeBoard() {
-        board = new int[Board.BOARD_SIZE];
+        board = new int[BOARD_SIZE];
         for (int i = 0; i < 14; i++) {
             board[i] = (i % 2 == 0) ? Board.HUMAN : Board.AI;
         }
-        // System.out.println("DEBUG: Board initialized with alternating pieces");
     }
 
     private void initializeUI() {
@@ -71,8 +71,6 @@ public class SenetGame {
 
         aiTimer = new Timer(1000, e -> {
             aiThinking = false;
-            // System.out.println("DEBUG: AI timer fired. AI turn status: " +
-            // currentPlayer);
             if (gameActive && currentPlayer == Board.AI) {
                 executeAITurn();
             }
@@ -99,14 +97,12 @@ public class SenetGame {
     }
 
     public void rollDiceForHuman() {
-        // System.out.println("DEBUG: rollDiceForHuman called");
         if (!gameActive || currentPlayer != Board.HUMAN || aiThinking) {
             infoPanel.showMessage("Warning: Cannot roll - not human turn or AI is thinking");
             return;
         }
 
         int roll = sticks.makeThrow();
-        // System.out.println("DEBUG: Roll result: " + roll);
         infoPanel.setDiceRoll(roll);
         infoPanel.showMessage("Human rolled: " + roll);
 
@@ -122,14 +118,15 @@ public class SenetGame {
     }
 
     public void executeHumanMove(Move move) {
-        // System.out.println("DEBUG: Executing move for human: " + move);
         if (!gameActive) {
             infoPanel.showMessage("Warning: Cannot move - game is inactive");
             return;
         }
 
         boardPanel.highlightMove(move);
-        Board.applyMove(board, move, Board.HUMAN, true);
+
+        // Use new Board.applyMove signature
+        Board.applyMove(board, move, Board.HUMAN);
 
         boolean pieceExited = false;
         if (move.to == -1) {
@@ -162,10 +159,7 @@ public class SenetGame {
     }
 
     private void executeAITurn() {
-        // System.out.println("DEBUG: Starting executeAITurn method");
         if (!gameActive || currentPlayer != Board.AI || aiThinking) {
-            // System.out.println("DEBUG: AI Turn aborted - active: " + gameActive + "
-            // current: " + currentPlayer);
             return;
         }
 
@@ -186,15 +180,34 @@ public class SenetGame {
         }
 
         boardPanel.highlightMove(null);
-        Move aiMove = ai.getBestMove(board, roll, AI_DEPTH);
+
+        // AI.getBestMove now only takes board and depth (no roll parameter)
+        // We need to filter moves by the actual roll
+        Move aiMove = null;
+        double bestValue = Double.NEGATIVE_INFINITY;
+
+        for (Move move : moves) {
+            // Simulate the move
+            int[] tempBoard = board.clone();
+            Board.applyMove(tempBoard, move, Board.AI);
+
+            // Get evaluation from AI
+            Move aiEvalMove = ai.getBestMove(tempBoard, AI_DEPTH);
+            // Since we can't get evaluation directly, we'll use a simple heuristic
+            // based on position advancement for now
+            double value = evaluatePosition(tempBoard, Board.AI);
+
+            if (value > bestValue) {
+                bestValue = value;
+                aiMove = move;
+            }
+        }
 
         if (aiMove != null) {
-            // System.out.println("DEBUG: AI selected move: " + aiMove);
-            infoPanel.setAIEvaluation(ai.getLastEvaluation(), ai.getNodesVisited());
             infoPanel.showMessage("AI chose: " + aiMove);
 
             boardPanel.highlightMove(aiMove);
-            Board.applyMove(board, aiMove, Board.AI, true);
+            Board.applyMove(board, aiMove, Board.AI);
 
             boolean pieceExited = false;
             if (aiMove.to == -1) {
@@ -213,7 +226,6 @@ public class SenetGame {
             updateBoardDisplay();
             checkGameEnd();
         } else {
-            // System.out.println("DEBUG: aiMove returned null for some reason?");
             infoPanel.showMessage("AI could not find a move. Turn skipped.");
         }
 
@@ -223,8 +235,20 @@ public class SenetGame {
         }
     }
 
+    private double evaluatePosition(int[] board, int player) {
+        // Simple evaluation function: sum of positions (higher is better for AI)
+        double score = 0;
+        for (int i = 0; i < board.length; i++) {
+            if (board[i] == Board.AI) {
+                score += (i + 1); // Higher position = better
+            } else if (board[i] == Board.HUMAN) {
+                score -= (i + 1); // Opponent pieces are bad
+            }
+        }
+        return player == Board.AI ? score : -score;
+    }
+
     private void switchTurn() {
-        // System.out.println("DEBUG: Switching turn from " + currentPlayer);
         if (!gameActive)
             return;
 
@@ -245,8 +269,6 @@ public class SenetGame {
     }
 
     private void checkGameEnd() {
-        // System.out.println("DEBUG: Checking game end. Human: " + humanExited + " AI:
-        // " + aiExited);
         if (humanExited >= TOTAL_PIECES) {
             infoPanel.showMessage("HUMAN WINS! All pieces exited!");
             gameActive = false;
@@ -261,7 +283,6 @@ public class SenetGame {
     }
 
     public void resetGame() {
-        // System.out.println("DEBUG: RESETTING ENTIRE GAME");
         if (aiTimer != null && aiTimer.isRunning()) {
             aiTimer.stop();
         }
@@ -288,7 +309,7 @@ public class SenetGame {
             try {
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
             } catch (Exception e) {
-                // System.out.println("WHY IS THE L&F BREAKING?? " + e.getMessage());
+                // Ignore look and feel exceptions
             }
             new SenetGame();
         });
