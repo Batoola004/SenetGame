@@ -170,38 +170,9 @@ public class SenetGame {
         infoPanel.setDiceRoll(roll);
         infoPanel.showMessage("AI rolled: " + roll);
 
-        List<Move> moves = Rules.getPossibleMoves(board, currentPlayer, roll);
-
-        if (moves.isEmpty()) {
-            infoPanel.showMessage("AI has no valid moves. Turn skipped.");
-            aiThinking = false;
-            switchTurn();
-            return;
-        }
-
-        boardPanel.highlightMove(null);
-
-        // AI.getBestMove now only takes board and depth (no roll parameter)
-        // We need to filter moves by the actual roll
-        Move aiMove = null;
-        double bestValue = Double.NEGATIVE_INFINITY;
-
-        for (Move move : moves) {
-            // Simulate the move
-            int[] tempBoard = board.clone();
-            Board.applyMove(tempBoard, move, Board.AI);
-
-            // Get evaluation from AI
-            Move aiEvalMove = ai.getBestMove(tempBoard, AI_DEPTH);
-            // Since we can't get evaluation directly, we'll use a simple heuristic
-            // based on position advancement for now
-            double value = evaluatePosition(tempBoard, Board.AI);
-
-            if (value > bestValue) {
-                bestValue = value;
-                aiMove = move;
-            }
-        }
+        // 1. Get the best move directly from the AI using Expectiminimax
+        // We pass the current board, the actual roll, and the search depth.
+        Move aiMove = ai.getBestMove(board, roll, AI_DEPTH);
 
         if (aiMove != null) {
             infoPanel.showMessage("AI chose: " + aiMove);
@@ -226,26 +197,13 @@ public class SenetGame {
             updateBoardDisplay();
             checkGameEnd();
         } else {
-            infoPanel.showMessage("AI could not find a move. Turn skipped.");
+            infoPanel.showMessage("AI has no valid moves. Turn skipped.");
         }
 
         aiThinking = false;
         if (gameActive) {
             switchTurn();
         }
-    }
-
-    private double evaluatePosition(int[] board, int player) {
-        // Simple evaluation function: sum of positions (higher is better for AI)
-        double score = 0;
-        for (int i = 0; i < board.length; i++) {
-            if (board[i] == Board.AI) {
-                score += (i + 1); // Higher position = better
-            } else if (board[i] == Board.HUMAN) {
-                score -= (i + 1); // Opponent pieces are bad
-            }
-        }
-        return player == Board.AI ? score : -score;
     }
 
     private void switchTurn() {
@@ -325,7 +283,6 @@ public class SenetGame {
         public ControlPanel(SenetGame game) {
             this.game = game;
             setLayout(new BorderLayout(15, 15));
-            setPreferredSize(new Dimension(350, 0));
             setBackground(new Color(245, 222, 179));
             setBorder(createBorder());
             initializeComponents();
