@@ -13,14 +13,14 @@ public class ControlPanel extends JPanel {
 
     public ControlPanel(SenetGame game) {
         this.game = game;
-        // System.out.println("DEBUG: ControlPanel init started");
+
         setLayout(new BorderLayout(10, 10));
         setPreferredSize(new Dimension(300, 0));
         setBackground(new Color(245, 222, 179));
         setBorder(createBorder());
 
         initializeComponents();
-        // System.out.println("DEBUG: ControlPanel components initialized");
+
     }
 
     private Border createBorder() {
@@ -46,13 +46,11 @@ public class ControlPanel extends JPanel {
 
         rollButton = createStyledButton("Roll Sticks", new Color(34, 139, 34));
         rollButton.addActionListener(e -> {
-            // System.out.println("DEBUG: Roll button clicked");
             game.rollDiceForHuman();
         });
 
         resetButton = createStyledButton("Reset Game", new Color(178, 34, 34));
         resetButton.addActionListener(e -> {
-            // System.out.println("DEBUG: Reset triggered by user");
             game.resetGame();
         });
 
@@ -97,7 +95,6 @@ public class ControlPanel extends JPanel {
     }
 
     public void showMoveButtons(List<Move> moves) {
-        // System.out.println("DEBUG: Updating moves list, size: " + moves.size());
         movesPanel.removeAll();
 
         if (moves.isEmpty()) {
