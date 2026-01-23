@@ -107,47 +107,31 @@ public class Board {
     public static final int AI = -1;
     public static final int EMPTY = 0;
 
+    /**
+     * Applies a move to the board.
+     * move.from: 1-30 (square number)
+     * move.to: 1-30 (square number) OR -1 (exiting the board)
+     */
     public static void applyMove(int[] board, Move move, int player) {
-        int fromIdx = move.from - 1;
-
-        if (fromIdx >= 0 && fromIdx < board.length) {
-            board[fromIdx] = EMPTY;
-        }
-
         if (move.to == -1) {
+            // Piece exits the board
+            board[move.from - 1] = 0;
             return;
         }
 
+        int fromIdx = move.from - 1;
         int toIdx = move.to - 1;
+        int opponent = -player;
 
-        if (toIdx < 0 || toIdx >= board.length) {
-            return;
-        }
-
-        if (board[toIdx] != EMPTY && board[toIdx] != player && !Rules.isProtected(move.to)) {
-            int opponentPiece = board[toIdx];
+        // Check if landing on opponent's piece (swap positions)
+        if (board[toIdx] == opponent && !Rules.isProtected(move.to)) {
+            // Swap positions
             board[toIdx] = player;
-
-            if (fromIdx >= 0) {
-                board[fromIdx] = opponentPiece;
-            }
+            board[fromIdx] = opponent;
         } else {
-
+            // Normal move
             board[toIdx] = player;
-        }
-
-        int finalSquare = Rules.applySpecialSquareEffect(move.to, board);
-
-        if (finalSquare == -1) {
-
-            board[toIdx] = EMPTY;
-        } else if (finalSquare != move.to) {
-
-            board[toIdx] = EMPTY;
-            int finalIdx = finalSquare - 1;
-            if (finalIdx >= 0 && finalIdx < board.length) {
-                board[finalIdx] = player;
-            }
+            board[fromIdx] = 0;
         }
     }
 }

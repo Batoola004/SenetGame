@@ -200,4 +200,5 @@ public class InfoPanel extends JPanel {
         });
         flashTimer.start();
     }
+
 }
