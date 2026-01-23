@@ -22,7 +22,6 @@ public class SenetGame {
     private boolean gameActive = true;
     private boolean aiThinking = false;
 
-    // Define board size since Board class doesn't have it anymore
     private static final int BOARD_SIZE = 30;
 
     public SenetGame() {
@@ -125,7 +124,6 @@ public class SenetGame {
 
         boardPanel.highlightMove(move);
 
-        // Use new Board.applyMove signature
         Board.applyMove(board, move, Board.HUMAN);
 
         boolean pieceExited = false;
@@ -170,8 +168,6 @@ public class SenetGame {
         infoPanel.setDiceRoll(roll);
         infoPanel.showMessage("AI rolled: " + roll);
 
-        // 1. Get the best move directly from the AI using Expectiminimax
-        // We pass the current board, the actual roll, and the search depth.
         Move aiMove = ai.getBestMove(board, roll, AI_DEPTH);
 
         if (aiMove != null) {
@@ -267,7 +263,7 @@ public class SenetGame {
             try {
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
             } catch (Exception e) {
-                // Ignore look and feel exceptions
+
             }
             new SenetGame();
         });

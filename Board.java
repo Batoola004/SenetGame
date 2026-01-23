@@ -107,53 +107,42 @@ public class Board {
     public static final int AI = -1;
     public static final int EMPTY = 0;
 
-    /**
-     * Applies a move to the board.
-     * move.from: 1-30 (square number)
-     * move.to: 1-30 (square number) OR -1 (exiting the board)
-     */
     public static void applyMove(int[] board, Move move, int player) {
         int fromIdx = move.from - 1;
 
-        // 1. Remove piece from starting position
         if (fromIdx >= 0 && fromIdx < board.length) {
             board[fromIdx] = EMPTY;
         }
 
-        // 2. If the piece is exiting the board, we are done
         if (move.to == -1) {
             return;
         }
 
-        // 3. Handle landing on a destination square (1-30)
         int toIdx = move.to - 1;
 
-        // Safety check for array bounds
         if (toIdx < 0 || toIdx >= board.length) {
             return;
         }
 
-        // Handle swapping if the square is occupied by an unprotected opponent
         if (board[toIdx] != EMPTY && board[toIdx] != player && !Rules.isProtected(move.to)) {
             int opponentPiece = board[toIdx];
             board[toIdx] = player;
-            // Opponent piece is swapped back to the 'from' square
+
             if (fromIdx >= 0) {
                 board[fromIdx] = opponentPiece;
             }
         } else {
-            // Otherwise, just place the piece
+
             board[toIdx] = player;
         }
 
-        // 4. Apply special square effects (like House of Water)
         int finalSquare = Rules.applySpecialSquareEffect(move.to, board);
 
         if (finalSquare == -1) {
-            // Piece exits via special effect
+
             board[toIdx] = EMPTY;
         } else if (finalSquare != move.to) {
-            // Piece is moved to a different square (e.g., Square 15)
+
             board[toIdx] = EMPTY;
             int finalIdx = finalSquare - 1;
             if (finalIdx >= 0 && finalIdx < board.length) {

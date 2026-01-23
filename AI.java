@@ -144,7 +144,6 @@ import java.util.List;
 
 public class AI {
 
-    // Probabilities for rolling 1, 2, 3, 4, or 5
     private static final double P_1 = 0.25; // 1/4
     private static final double P_2 = 0.375; // 3/8
     private static final double P_3 = 0.25; // 1/4
@@ -168,7 +167,6 @@ public class AI {
             int[] nextBoard = board.clone();
             Board.applyMove(nextBoard, move, Board.AI);
 
-            // After AI moves, it's a chance node for the next turn
             double value = expectiminimax(nextBoard, depth - 1, false, 0, Double.NEGATIVE_INFINITY,
                     Double.POSITIVE_INFINITY);
 
@@ -193,7 +191,6 @@ public class AI {
             return evaluate(board);
         }
 
-        // --- CHANCE NODE ---
         if (fixedRoll == 0) {
             return P_1 * expectiminimax(board, depth - 1, isMax, 1, alpha, beta) +
                     P_2 * expectiminimax(board, depth - 1, isMax, 2, alpha, beta) +
@@ -202,12 +199,11 @@ public class AI {
                     P_5 * expectiminimax(board, depth - 1, isMax, 5, alpha, beta);
         }
 
-        // --- MAX/MIN NODE ---
         int player = isMax ? Board.AI : Board.HUMAN;
         List<Move> moves = Rules.getPossibleMoves(board, player, fixedRoll);
 
         if (moves.isEmpty()) {
-            // Skip turn
+
             return expectiminimax(board, depth - 1, !isMax, 0, alpha, beta);
         }
 
@@ -248,7 +244,6 @@ public class AI {
                 humanPieces++;
         }
 
-        // Reward for pieces that have already exited (5 total pieces)
         score += (5 - humanPieces) * 100;
         score -= (5 - aiPieces) * 100;
 
@@ -258,7 +253,7 @@ public class AI {
                 if (Rules.isProtected(i + 1))
                     score += 10;
                 if (i > 0 && board[i - 1] == Board.AI)
-                    score += 5; // Blockade
+                    score += 5;
             } else if (board[i] == Board.HUMAN) {
                 score -= (i + 1);
                 if (Rules.isProtected(i + 1))
