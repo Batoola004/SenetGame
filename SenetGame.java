@@ -32,7 +32,6 @@ public class SenetGame {
 
     private void initializeBoard() {
         board = new int[BOARD_SIZE];
-        // Alternating setup
         for (int i = 0; i < 14; i++) {
             board[i] = (i % 2 == 0) ? Board.HUMAN : Board.AI;
         }
@@ -42,7 +41,9 @@ public class SenetGame {
         mainFrame = new JFrame("Senet - Ancient Egyptian Board Game");
         mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         mainFrame.setLayout(new BorderLayout(15, 15));
-        mainFrame.getContentPane().setBackground(new Color(245, 222, 179));
+
+        Color bgColor = new Color(245, 222, 179);
+        mainFrame.getContentPane().setBackground(bgColor);
 
         boardPanel = new GameBoardPanel();
         controlPanel = new ControlPanel(this);
@@ -53,10 +54,21 @@ public class SenetGame {
         mainFrame.add(infoPanel, BorderLayout.SOUTH);
 
         mainFrame.setSize(1400, 950);
+        mainFrame.setMinimumSize(new Dimension(1200, 800));
         mainFrame.setLocationRelativeTo(null);
+
+        mainFrame.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                if (aiTimer != null && aiTimer.isRunning()) {
+                    aiTimer.stop();
+                }
+            }
+        });
+
         mainFrame.setVisible(true);
 
-        aiTimer = new Timer(1500, e -> {
+        aiTimer = new Timer(1000, e -> {
             aiThinking = false;
             if (gameActive && currentPlayer == Board.AI) {
                 executeAITurn();
@@ -69,7 +81,9 @@ public class SenetGame {
         updateBoardDisplay();
         updateInfoPanel();
         controlPanel.setGameControlsEnabled(true);
+        infoPanel.clearMessages();
         infoPanel.showMessage("Game started. Human player begins.");
+        infoPanel.showMessage("Rules: First to exit all 5 pieces wins.");
     }
 
     public void updateBoardDisplay() {
@@ -81,10 +95,9 @@ public class SenetGame {
         infoPanel.updateInfo(currentPlayer, humanExited, aiExited);
     }
 
-    // --- HUMAN LOGIC ---
-
     public void rollDiceForHuman() {
         if (!gameActive || currentPlayer != Board.HUMAN || aiThinking) {
+            infoPanel.showMessage("Warning: Cannot roll - not human turn or AI is thinking");
             return;
         }
 
@@ -96,24 +109,25 @@ public class SenetGame {
 
         if (moves.isEmpty()) {
             infoPanel.showMessage("No valid moves. Turn skipped.");
-            // Even if turn is skipped, we must check if pieces on special squares
-            // failed to move and need to be reset.
+            // CRITICAL: Even if turn is skipped, check if pieces on 28/29/30 failed to exit
             handleUnplayedSpecialPieces(Board.HUMAN, null);
             updateBoardDisplay();
             switchTurn();
         } else {
             controlPanel.showMoveButtons(moves);
+            infoPanel.showMessage("Found " + moves.size() + " valid moves.");
         }
     }
 
     public void executeHumanMove(Move move) {
-        if (!gameActive)
+        if (!gameActive) {
+            infoPanel.showMessage("Warning: Cannot move - game is inactive");
             return;
+        }
 
         performMoveLogic(move, Board.HUMAN);
 
-        // After move is done, check if any OTHER pieces on special squares
-        // failed to exit and need to be sent back.
+        // Logic Check: Any piece on 28/29/30 that wasn't just moved is now drowned
         handleUnplayedSpecialPieces(Board.HUMAN, move);
 
         updateBoardDisplay();
@@ -124,11 +138,10 @@ public class SenetGame {
         }
     }
 
-    // --- AI LOGIC ---
-
     private void executeAITurn() {
-        if (!gameActive)
+        if (!gameActive || currentPlayer != Board.AI || aiThinking) {
             return;
+        }
 
         aiThinking = true;
         infoPanel.showMessage("AI is thinking...");
@@ -140,14 +153,11 @@ public class SenetGame {
         Move aiMove = ai.getBestMove(board, roll, AI_DEPTH);
 
         if (aiMove != null) {
-            infoPanel.showMessage("AI moves: " + aiMove);
+            infoPanel.showMessage("AI chose: " + aiMove);
             performMoveLogic(aiMove, Board.AI);
-
-            // Check penalties for AI pieces
             handleUnplayedSpecialPieces(Board.AI, aiMove);
         } else {
-            infoPanel.showMessage("AI has no valid moves.");
-            // Check penalties even if AI skips turn
+            infoPanel.showMessage("AI has no valid moves. Turn skipped.");
             handleUnplayedSpecialPieces(Board.AI, null);
         }
 
@@ -160,11 +170,8 @@ public class SenetGame {
         }
     }
 
-    // --- CORE GAMEPLAY HELPERS ---
+    // --- NEW LOGIC HELPERS ---
 
-    /**
-     * Applies the move and handles immediate effects (Water -> Rebirth)
-     */
     private void performMoveLogic(Move move, int player) {
         boardPanel.highlightMove(move);
         Board.applyMove(board, move, player);
@@ -176,71 +183,60 @@ public class SenetGame {
                 aiExited++;
             infoPanel.showMessage((player == Board.HUMAN ? "Human" : "AI") + " piece exited!");
         } else {
-            // Check immediate effects (House of Water)
-            int effectSquare = Rules.applySpecialSquareEffect(move.to, board);
-
-            if (effectSquare != move.to) {
-                // Relocation triggered (e.g. Water -> Rebirth)
+            // Check Immediate Effect (House of Water -> Rebirth)
+            int effect = Rules.applySpecialSquareEffect(move.to, board);
+            if (effect != move.to) {
+                // If Rules say goto 15, but 15 is full, find spot before
                 sendPieceToRebirthOrBefore(move.to, player);
             }
         }
     }
 
-    /**
-     * Enforces the rule: "Otherwise, the pawn will be sent back to the House of
-     * Rebirth."
-     * This runs at the END of a turn.
-     * * @param player The current player
-     * 
-     * @param moveJustMade The move that was just executed (to avoid punishing the
-     *                     piece that just arrived)
-     */
     private void handleUnplayedSpecialPieces(int player, Move moveJustMade) {
         int[] specialSquares = { Rules.HOUSE_OF_THREE_TRUTHS, Rules.HOUSE_OF_RE_ATUM, Rules.HOUSE_OF_HORUS };
 
         for (int sq : specialSquares) {
             int idx = sq - 1;
-
-            // If the current player has a piece on a special square...
+            // If piece belongs to current player
             if (board[idx] == player) {
-
-                // If this piece JUST arrived here this turn, it is safe.
+                // If it is NOT the piece we just moved (meaning it sat there this turn)
                 if (moveJustMade != null && moveJustMade.to == sq) {
-                    continue;
+                    continue; // Safe, just arrived
                 }
 
-                // If it was already there and didn't exit, apply penalty.
-                infoPanel.showMessage("Piece on Square " + sq + " failed to exit!");
+                // Then it failed to exit -> Send to Rebirth
+                infoPanel.showMessage("Piece on Square " + sq + " failed to exit and drowns!");
                 sendPieceToRebirthOrBefore(sq, player);
             }
         }
     }
 
-    /**
-     * Moves a piece from currentSquare to House of Rebirth (15).
-     * If 15 is occupied, finds the first empty square before 15.
-     */
     private void sendPieceToRebirthOrBefore(int currentSquare, int player) {
-        int target = Rules.HOUSE_OF_REBIRTH; // 15
-        int targetIdx = target - 1;
+        // Start looking at Rebirth (15)
+        int targetIdx = Rules.HOUSE_OF_REBIRTH - 1;
 
-        // If Rebirth is occupied, search backwards
+        // If occupied, search backwards
         while (targetIdx >= 0 && board[targetIdx] != 0) {
             targetIdx--;
         }
 
-        // If valid empty spot found (or board[0] if board is super full)
         if (targetIdx >= 0) {
-            board[currentSquare - 1] = 0; // Remove from old spot
-            board[targetIdx] = player; // Place in new spot
-
-            String name = (player == Board.HUMAN) ? "Human" : "AI";
-            infoPanel.showMessage(name + " piece sent back to Square " + (targetIdx + 1));
+            board[currentSquare - 1] = 0; // Empty old spot
+            board[targetIdx] = player; // Fill new spot
+            String pName = (player == Board.HUMAN) ? "Human" : "AI";
+            infoPanel.showMessage(pName + " piece relocated to Square " + (targetIdx + 1));
         }
     }
 
+    // --- END NEW LOGIC HELPERS ---
+
     private void switchTurn() {
+        if (!gameActive)
+            return;
+
+        infoPanel.showMessage("Switching turn...");
         currentPlayer = -currentPlayer;
+
         controlPanel.clearMoveButtons();
         updateInfoPanel();
 
@@ -256,24 +252,25 @@ public class SenetGame {
 
     private void checkGameEnd() {
         if (humanExited >= TOTAL_PIECES) {
-            finishGame("HUMAN");
+            infoPanel.showMessage("HUMAN WINS! All pieces exited!");
+            gameActive = false;
+            controlPanel.setGameControlsEnabled(false);
+            infoPanel.showWinMessage("HUMAN");
         } else if (aiExited >= TOTAL_PIECES) {
-            finishGame("AI");
+            infoPanel.showMessage("AI WINS! All pieces exited!");
+            gameActive = false;
+            controlPanel.setGameControlsEnabled(false);
+            infoPanel.showWinMessage("AI");
         }
     }
 
-    private void finishGame(String winner) {
-        gameActive = false;
-        infoPanel.showMessage(winner + " WINS! All pieces exited!");
-        infoPanel.showWinMessage(winner);
-        controlPanel.setGameControlsEnabled(false);
-    }
-
     public void resetGame() {
-        if (aiTimer != null && aiTimer.isRunning())
+        if (aiTimer != null && aiTimer.isRunning()) {
             aiTimer.stop();
-        gameActive = true;
+        }
+
         aiThinking = false;
+        gameActive = true;
         initializeBoard();
         currentPlayer = Board.HUMAN;
         humanExited = 0;
@@ -284,7 +281,9 @@ public class SenetGame {
         controlPanel.clearMoveButtons();
         controlPanel.setGameControlsEnabled(true);
         infoPanel.clearMessages();
-        infoPanel.showMessage("Game reset. Human starts.");
+        boardPanel.highlightMove(null);
+
+        infoPanel.showMessage("Game reset. Human player starts.");
     }
 
     public static void launchGame() {
@@ -297,13 +296,8 @@ public class SenetGame {
         });
     }
 
-    // --- INNER CLASSES (UI) ---
-    // (Keep your existing ControlPanel, InfoPanel, etc. here)
+    // --- YOUR ORIGINAL CONTROL PANEL (PRESERVED) ---
     private static class ControlPanel extends JPanel {
-        // ... (Keep existing ControlPanel code exactly as provided in previous prompt)
-        // ...
-        // For brevity, I am assuming the previous ControlPanel code is pasted here
-        // as it does not require logical changes, only the SenetGame reference.
         private JButton rollButton;
         private JButton resetButton;
         private JPanel movesPanel;
@@ -314,23 +308,43 @@ public class SenetGame {
             this.game = game;
             setLayout(new BorderLayout(15, 15));
             setBackground(new Color(245, 222, 179));
-            setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+            setBorder(createBorder());
             initializeComponents();
+        }
+
+        private Border createBorder() {
+            return BorderFactory.createCompoundBorder(
+                    BorderFactory.createTitledBorder(
+                            BorderFactory.createLineBorder(new Color(139, 69, 19), 3),
+                            "Game Controls",
+                            TitledBorder.CENTER,
+                            TitledBorder.TOP,
+                            new Font("Arial", Font.BOLD, 18),
+                            new Color(139, 69, 19)),
+                    BorderFactory.createEmptyBorder(15, 15, 15, 15));
         }
 
         private void initializeComponents() {
             statusLabel = new JLabel("Human Turn", SwingConstants.CENTER);
             statusLabel.setFont(new Font("Arial", Font.BOLD, 20));
+            statusLabel.setForeground(new Color(139, 69, 19));
+            statusLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
             add(statusLabel, BorderLayout.NORTH);
 
-            JPanel buttonPanel = new JPanel(new GridLayout(2, 1, 10, 10));
+            JPanel buttonPanel = new JPanel(new GridLayout(2, 1, 20, 20));
             buttonPanel.setBackground(new Color(245, 222, 179));
+            buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-            rollButton = new JButton("Roll Sticks");
+            rollButton = createStyledButton("Roll Sticks", new Color(34, 139, 34));
             rollButton.addActionListener(e -> game.rollDiceForHuman());
 
-            resetButton = new JButton("Reset Game");
-            resetButton.addActionListener(e -> game.resetGame());
+            resetButton = createStyledButton("Reset Game", new Color(178, 34, 34));
+            resetButton.addActionListener(e -> {
+                int confirm = JOptionPane.showConfirmDialog(game.mainFrame, "Reset game?");
+                if (confirm == JOptionPane.YES_OPTION) {
+                    game.resetGame();
+                }
+            });
 
             buttonPanel.add(rollButton);
             buttonPanel.add(resetButton);
@@ -338,18 +352,51 @@ public class SenetGame {
 
             movesPanel = new JPanel();
             movesPanel.setLayout(new BoxLayout(movesPanel, BoxLayout.Y_AXIS));
-            add(new JScrollPane(movesPanel), BorderLayout.SOUTH);
+            movesPanel.setBackground(new Color(245, 222, 179));
+            movesPanel.setBorder(BorderFactory.createTitledBorder("Available Moves"));
+
+            JScrollPane scrollPane = new JScrollPane(movesPanel);
+            scrollPane.setPreferredSize(new Dimension(300, 400));
+            add(scrollPane, BorderLayout.SOUTH);
+        }
+
+        private JButton createStyledButton(String text, Color color) {
+            JButton button = new JButton(text);
+            button.setFont(new Font("Arial", Font.BOLD, 16));
+            button.setBackground(color);
+            button.setForeground(Color.WHITE);
+            button.setFocusPainted(false);
+            button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            return button;
         }
 
         public void showMoveButtons(List<Move> moves) {
             movesPanel.removeAll();
-            for (Move m : moves) {
-                JButton btn = new JButton(m.toString());
-                btn.addActionListener(e -> {
-                    game.executeHumanMove(m);
-                    clearMoveButtons();
-                });
-                movesPanel.add(btn);
+            if (moves.isEmpty()) {
+                movesPanel.add(new JLabel("No moves available"));
+            } else {
+                for (int i = 0; i < moves.size(); i++) {
+                    Move move = moves.get(i);
+                    JButton mBtn = new JButton((i + 1) + ") " + move.toString());
+                    mBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+                    mBtn.addActionListener(e -> {
+                        game.executeHumanMove(move);
+                        clearMoveButtons();
+                    });
+
+                    mBtn.addMouseListener(new MouseAdapter() {
+                        public void mouseEntered(MouseEvent e) {
+                            game.boardPanel.highlightMove(move);
+                        }
+
+                        public void mouseExited(MouseEvent e) {
+                            game.boardPanel.highlightMove(null);
+                        }
+                    });
+
+                    movesPanel.add(mBtn);
+                    movesPanel.add(Box.createRigidArea(new Dimension(0, 5)));
+                }
             }
             movesPanel.revalidate();
             movesPanel.repaint();
@@ -357,13 +404,16 @@ public class SenetGame {
 
         public void clearMoveButtons() {
             movesPanel.removeAll();
+            movesPanel.add(new JLabel("Roll to see moves"));
             movesPanel.revalidate();
             movesPanel.repaint();
+            game.boardPanel.highlightMove(null);
         }
 
         public void setGameControlsEnabled(boolean enabled) {
             rollButton.setEnabled(enabled);
             statusLabel.setText(enabled ? "Human Turn" : "AI Turn");
+            statusLabel.setForeground(enabled ? new Color(34, 139, 34) : new Color(178, 34, 34));
         }
     }
 }
