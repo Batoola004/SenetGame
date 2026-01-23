@@ -1,4 +1,5 @@
 
+//كلاس واجهات
 import javax.swing.*;
 import java.awt.*;
 

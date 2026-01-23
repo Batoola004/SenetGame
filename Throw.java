@@ -11,10 +11,12 @@ public class Throw {
 
     public int makeThrow() {
         int total = 0;
+        // لعد العصي الغامقة
         for (int i = 0; i < 4; i++) {
             if (sticks[i].throwIt() == 'D')
                 total++;
         }
+        // حساب المجموع وارجاعه
         if (total == 0)
             total = 5;
         return total;

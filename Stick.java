@@ -8,6 +8,7 @@ public class Stick {
 
     }
 
+    // تابع لاختيار لون العصا فاتح او غامق
     public char throwIt() {
         faceColor = random.nextBoolean() ? 'D' : 'L';
         return faceColor;
@@ -17,6 +18,7 @@ public class Stick {
         return faceColor;
     }
 
+    // تمثيل الشكل
     public String getVisual() {
         if (faceColor == 'D') {
             return "╿";
