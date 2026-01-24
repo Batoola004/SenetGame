@@ -30,6 +30,7 @@ public class AI {
             // تطبيق الحركة على البورد
             Board.applyMove(nextBoard, move, Board.AI);
 
+            // تطبيق الخوارزمية
             double value = expectiminimax(nextBoard, depth - 1, false, 0, Double.NEGATIVE_INFINITY,
                     Double.POSITIVE_INFINITY);
 

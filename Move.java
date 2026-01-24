@@ -10,6 +10,7 @@ public class Move {
         this.to = to;
     }
 
+    // تابع لطباعة الحركات الممكنة للاعب ليختار منهم
     @Override
     public String toString() {
         String fromStr = (from == 0) ? "Off-board" : "Sq" + from;
